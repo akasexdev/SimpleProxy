@@ -33,7 +33,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			simple.Foo();
 		}
 
-		[Benchmark]
+		/*[Benchmark]
 		public void Castle_Boxing()
 		{
 			castle.FooWithParams(1,2,3,4);
@@ -43,7 +43,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		public void Simple_Boxing()
 		{
 			simple.FooWithParams(1, 2, 3, 4);
-		}
+		}*/
 	}
 
 	public class Interceptor : IInterceptor, SimpleProxyFactory.IHandler
