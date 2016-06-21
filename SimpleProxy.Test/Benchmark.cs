@@ -41,7 +41,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			simpleForTarget.Foo();
 		}
 		
-		/*[Benchmark]
+		[Benchmark]
 		public void Manual_ManySimpleParams()
 		{
 			manualForTarget.FooWithParams(1, 2, 3, 4);
@@ -57,8 +57,8 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		public void Simple_ManySimpleParams()
 		{
 			simpleForTarget.FooWithParams(1, 2, 3, 4);
-		}*/
-		/*
+		}
+		
 		[Benchmark]
 		public void Manual_WithoutTarget_NoParameters()
 		{
@@ -75,9 +75,9 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		public void Simple_WithoutTarget_NoParameters()
 		{
 			simpleWithoutTarget.Foo();
-		}*/
+		}
 
-		/*[Benchmark]
+		[Benchmark]
 		public void Manual_WithoutTarget_ManySimpleParams()
 		{
 			manualWithoutTarget.FooWithParams(1, 2, 3, 4);
@@ -93,7 +93,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		public void Simple_WithoutTarget_ManySimpleParams()
 		{
 			simpleWithoutTarget.FooWithParams(1, 2, 3, 4);
-		}*/
+		}
 
 		public interface IInterface
 		{
