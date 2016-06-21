@@ -25,7 +25,6 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			{
 				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new DelegateHandler(c => invocations.Add(c)));
-				var proxy2 = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface2>(new DelegateHandler(c => invocations.Add(c)));
 				proxy.Foo();
 				Assert.That(invocations.Single().MethodInfo.Name, Is.EqualTo("Foo"));
 				Assert.That(invocations.Single().Arguments, Is.Empty);
@@ -146,6 +145,33 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			{
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new DelegateHandler(c => 42));
 				Assert.That(proxy.Foo(), Is.EqualTo(42));
+			}
+		}
+
+		public class ProxyWithTarget_CalledWithCorrectParameters : TestBase
+		{
+			public interface IInterface
+			{
+				void Foo(int one, int two, int three, string four);
+			}
+
+			private class Impl : IInterface
+			{
+				public readonly List<Tuple<int, int, int, string>> Invocations = new List<Tuple<int, int, int, string>>();
+
+				public void Foo(int one, int two, int three, string four)
+				{
+					Invocations.Add(Tuple.Create(one, two, three, four));
+				}
+			}
+
+			[Test]
+			public void Test()
+			{
+				var impl = new Impl();
+				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(c => c.Proceed()), impl);
+				proxy.Foo(1, 2, 3, "four");
+				Assert.That(impl.Invocations.Single(), Is.EqualTo(Tuple.Create(1, 2, 3, "four")));
 			}
 		}
 

@@ -3,17 +3,13 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 
 namespace Kontur.Elba.Core.Utilities.Reflection
 {
 	public static class SimpleProxyFactory
 	{
-		static SimpleProxyFactory()
-		{
-			var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(typeof(SimpleProxyFactory).Name), AssemblyBuilderAccess.RunAndCollect);
-			module = assemblyBuilder.DefineDynamicModule("main");
-		}
-
+		private static int counter;
 		private static readonly ModuleBuilder module;
 
 		private static readonly ConcurrentDictionary<MethodInfo, Type> interceptorArgsTypes =
@@ -22,6 +18,13 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 		private static readonly ConcurrentDictionary<Type, Type> types =
 			new ConcurrentDictionary<Type, Type>();
 
+		static SimpleProxyFactory()
+		{
+			var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(typeof (SimpleProxyFactory).Name),
+				AssemblyBuilderAccess.RunAndCollect);
+			module = assemblyBuilder.DefineDynamicModule("main");
+		}
+
 		public static TInterface CreateProxyWithoutTarget<TInterface>(IHandler handler)
 		{
 			return CreateProxyForTarget(new Adapter(handler), default(TInterface));
@@ -29,26 +32,26 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 
 		public static TInterface CreateProxyForTarget<TInterface>(IInterceptor interceptor, TInterface target)
 		{
-			var typeBuilder = types.GetOrAdd(typeof(TInterface), _ => EmitProxyForTarget<TInterface>());
-			return (TInterface)Activator.CreateInstance(typeBuilder, interceptor, target);
+			var typeBuilder = types.GetOrAdd(typeof (TInterface), _ => EmitProxyForTarget<TInterface>());
+			return (TInterface) Activator.CreateInstance(typeBuilder, interceptor, target);
 		}
 
 		private static Type EmitProxyForTarget<TInterface>()
 		{
-			if (!typeof(TInterface).IsInterface)
-				throw new InvalidOperationException(string.Format("{0} is not an interface type", typeof(TInterface)));
-			var typeBuilder = module.DefineType(typeof(TInterface) + "_proxy", TypeAttributes.Public);
+			if (!typeof (TInterface).IsInterface)
+				throw new InvalidOperationException(string.Format("{0} is not an interface type", typeof (TInterface)));
+			var typeBuilder = module.DefineType(typeof (TInterface) + "_proxy", TypeAttributes.Public);
 			var originalMethods = typeof (TInterface).GetMethods(BindingFlags.Instance | BindingFlags.Public)
 				.OrderBy(x => x.Name)
 				.ThenBy(x => string.Join("_", x.GetParameters().Select(p => p.ParameterType.Name).ToArray()))
 				.ToArray();
 			typeBuilder.AddInterfaceImplementation(typeof (TInterface));
-			var interceptorField = typeBuilder.DefineField("interceptor", typeof(IInterceptor), FieldAttributes.Private);
+			var interceptorField = typeBuilder.DefineField("interceptor", typeof (IInterceptor), FieldAttributes.Private);
 			var proxyField = typeBuilder.DefineField("proxy", typeof (TInterface), FieldAttributes.Private);
 			var methodInfosField = typeBuilder.DefineField("methods", typeof (MethodBase).MakeArrayType(),
 				FieldAttributes.Private);
 			var ctor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis,
-				new[] {typeof (IInterceptor), typeof (TInterface) });
+				new[] {typeof (IInterceptor), typeof (TInterface)});
 			var ctorIl = ctor.GetILGenerator();
 			ctorIl.Emit(OpCodes.Ldarg_0);
 			ctorIl.Emit(OpCodes.Ldarg_1);
@@ -57,20 +60,20 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 			ctorIl.Emit(OpCodes.Ldarg_2);
 			ctorIl.Emit(OpCodes.Stfld, proxyField);
 			ctorIl.Emit(OpCodes.Ldarg_0);
-			ctorIl.Emit(OpCodes.Ldc_I4, originalMethods.Length);
-			ctorIl.Emit(OpCodes.Newarr, typeof(MethodBase));
+			EmitIntConst(ctorIl, originalMethods.Length);
+			ctorIl.Emit(OpCodes.Newarr, typeof (MethodBase));
 			ctorIl.Emit(OpCodes.Stfld, methodInfosField);
-			for (int index = 0; index < originalMethods.Length; index++)
+			for (var index = 0; index < originalMethods.Length; index++)
 			{
 				var originalMethod = originalMethods[index];
 				ctorIl.Emit(OpCodes.Ldarg_0);
 				ctorIl.Emit(OpCodes.Ldfld, methodInfosField);
-				ctorIl.Emit(OpCodes.Ldc_I4, index);
+				EmitIntConst(ctorIl, index);
 				EmitLoadMethodInfo(ctorIl, originalMethod, typeof (TInterface));
 				ctorIl.Emit(OpCodes.Stelem, typeof (MethodBase));
 			}
 			ctorIl.Emit(OpCodes.Ret);
-			for (int index = 0; index < originalMethods.Length; index++)
+			for (var index = 0; index < originalMethods.Length; index++)
 			{
 				var originalMethod = originalMethods[index];
 				var proxyImplMethod = typeBuilder.DefineMethod(originalMethod.Name,
@@ -81,7 +84,10 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 				{
 					var originalGenericArgs = originalMethod.GetGenericArguments();
 					var genericParams = proxyImplMethod.DefineGenericParameters(originalGenericArgs.Select(x => "T" + x.Name).ToArray());
-					foreach (var tuple in genericParams.Zip(originalGenericArgs, Tuple.Create))
+					foreach (
+						var tuple in
+							genericParams.Zip(
+								originalGenericArgs, Tuple.Create))
 					{
 						var interfaceConstraints = tuple.Item2.GetGenericParameterConstraints().Where(x => x.IsInterface).ToArray();
 						var baseTypeConstraint = tuple.Item2.GetGenericParameterConstraints().FirstOrDefault(x => x.IsClass);
@@ -97,8 +103,10 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 				//new interceptor args
 				ilg.Emit(OpCodes.Ldarg_0);
 				ilg.Emit(OpCodes.Ldfld, proxyField);
-
+				
+				//ilg.Emit(OpCodes.Ldnull);
 				EmitNewMethodInvocation(ilg, originalMethod, methodInfosField, index);
+				
 				var interceptorArgsCtor =
 					GetInterceptorType(originalMethod).GetConstructor(new[] {typeof (object), typeof (MethodInvocation)});
 				ilg.Emit(OpCodes.Newobj, interceptorArgsCtor);
@@ -106,8 +114,7 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 				ilg.Emit(OpCodes.Stloc_0);
 				ilg.Emit(OpCodes.Ldloc_0);
 				// call interceptor handle method
-				var interceptorHandleMethod = typeof (IInterceptor).GetMethod("Handle");
-				ilg.Emit(OpCodes.Callvirt, interceptorHandleMethod);
+				ilg.Emit(OpCodes.Callvirt, typeof (IInterceptor).GetMethod("Handle"));
 				//get return value
 				if (originalMethod.ReturnType != typeof (void))
 				{
@@ -120,74 +127,34 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 			return typeBuilder.CreateType();
 		}
 
-		public static Func<object, object[], object> DoEmitCallOf(MethodInfo targetMethod)
+		private static void EmitNewMethodInvocation(ILGenerator generator, MethodInfo methodInfo, FieldInfo methodInfosField, int methodIndex)
 		{
-			var dynamicMethod = new DynamicMethod("callOf_" + targetMethod.Name,
-				typeof (object),
-				new[] {typeof (object), typeof (object[])},
-				typeof (SimpleProxyFactory),
-				true);
-			var il = dynamicMethod.GetILGenerator();
-			if (!targetMethod.IsStatic)
-			{
-				il.Emit(OpCodes.Ldarg_0);
-				if (targetMethod.DeclaringType.IsValueType)
-				{
-					il.Emit(OpCodes.Unbox_Any, targetMethod.DeclaringType);
-					il.DeclareLocal(targetMethod.DeclaringType);
-					il.Emit(OpCodes.Stloc_0);
-					il.Emit(OpCodes.Ldloca_S, 0);
-				}
-				else
-					il.Emit(OpCodes.Castclass, targetMethod.DeclaringType);
-			}
-			var parameters = targetMethod.GetParameters();
-			for (var i = 0; i < parameters.Length; i++)
-			{
-				il.Emit(OpCodes.Ldarg_1);
-				/*if (i <= 8)
-					il.Emit(ToConstant(i));
-				else*/
-				il.Emit(OpCodes.Ldc_I4, i);
-				il.Emit(OpCodes.Ldelem_Ref);
-				if (parameters[i].ParameterType.IsValueType)
-					il.Emit(OpCodes.Unbox_Any, parameters[i].ParameterType);
-			}
-			il.Emit(dynamicMethod.IsStatic ? OpCodes.Call : OpCodes.Callvirt, targetMethod);
-			if (targetMethod.ReturnType == typeof (void))
-				il.Emit(OpCodes.Ldnull);
-			else if (targetMethod.ReturnType.IsValueType)
-				il.Emit(OpCodes.Box, targetMethod.ReturnType);
-			il.Emit(OpCodes.Ret);
-			return (Func<object, object[], object>) dynamicMethod.CreateDelegate(typeof (Func<object, object[], object>));
-		}
-
-		private static void EmitNewMethodInvocation(ILGenerator generator, MethodInfo methodInfo, FieldBuilder methodInfosField, int methodIndex)
-		{
-			generator.Emit(OpCodes.Newobj, typeof(MethodInvocation).GetConstructor(Type.EmptyTypes));
-			//set name
-			generator.Emit(OpCodes.Dup);
+			//load name
 			generator.Emit(OpCodes.Ldarg_0);
 			generator.Emit(OpCodes.Ldfld, methodInfosField);
-			generator.Emit(OpCodes.Ldc_I4, methodIndex);
-			generator.Emit(OpCodes.Ldelem, typeof(MethodBase));
-			generator.Emit(OpCodes.Stfld, typeof(MethodInvocation).GetField("MethodInfo"));
-			//set parameters
-			generator.Emit(OpCodes.Dup);
-			generator.Emit(OpCodes.Ldc_I4, methodInfo.GetParameters().Length);
-			generator.Emit(OpCodes.Newarr, typeof(object));
+			EmitIntConst(generator, methodIndex);
+			generator.Emit(OpCodes.Ldelem, typeof (MethodBase));
+			//load parameters
+			
 			var parameters = methodInfo.GetParameters();
-			for (int index = 0; index < parameters.Length; index++)
+			if (parameters.Length > 0)
 			{
-				var parameter = parameters[index];
-				generator.Emit(OpCodes.Dup);
-				generator.Emit(OpCodes.Ldc_I4, index);
-				generator.Emit(OpCodes.Ldarg, index + 1);
-				if (parameter.ParameterType.IsValueType)
-					generator.Emit(OpCodes.Box, parameter.ParameterType);
-				generator.Emit(OpCodes.Stelem, typeof(object));
+				EmitIntConst(generator, methodInfo.GetParameters().Length);
+				generator.Emit(OpCodes.Newarr, typeof(object));
+				for (var index = 0; index < parameters.Length; index++)
+				{
+					var parameter = parameters[index];
+					generator.Emit(OpCodes.Dup);
+					EmitIntConst(generator, index);
+					generator.Emit(OpCodes.Ldarg, index + 1);
+					if (parameter.ParameterType.IsValueType)
+						generator.Emit(OpCodes.Box, parameter.ParameterType);
+					generator.Emit(OpCodes.Stelem, typeof(object));
+				}
+				generator.Emit(OpCodes.Newobj, typeof(MethodInvocation).GetConstructor(new[] { typeof(MethodInfo), typeof(object[]) }));
 			}
-			generator.Emit(OpCodes.Stfld, typeof(MethodInvocation).GetField("Arguments"));
+			else 
+				generator.Emit(OpCodes.Newobj, typeof(MethodInvocation).GetConstructor(new[] { typeof(MethodInfo)}));
 		}
 
 		private static void EmitLoadMethodInfo(ILGenerator generator, MethodInfo methodInfo, Type interfaceType)
@@ -195,8 +162,8 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 			generator.Emit(OpCodes.Ldtoken, methodInfo);
 			generator.Emit(OpCodes.Ldtoken, interfaceType);
 			generator.Emit(OpCodes.Call,
-						   typeof(MethodBase).GetMethod("GetMethodFromHandle", BindingFlags.Static | BindingFlags.Public, null,
-						   new[] { typeof(RuntimeMethodHandle), typeof(RuntimeTypeHandle) }, new ParameterModifier[0]));
+				typeof (MethodBase).GetMethod("GetMethodFromHandle", BindingFlags.Static | BindingFlags.Public, null,
+					new[] {typeof (RuntimeMethodHandle), typeof (RuntimeTypeHandle)}, new ParameterModifier[0]));
 		}
 
 		private static Type GetInterceptorType(MethodInfo methodInfo)
@@ -206,8 +173,12 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 
 		private static Type EmitInterceptorType(MethodInfo proxiedMethod)
 		{
-			var typeBuilder = module.DefineType("InterceptorArgs_" + proxiedMethod.Name, TypeAttributes.Public, typeof (InterceptorArgs));
-			
+			var name = "InterceptorArgs_"
+			           + proxiedMethod.Name
+			           + string.Join("_", proxiedMethod.GetParameters().Select(x => x.ParameterType.Name))
+			           + "_" + Interlocked.Increment(ref counter);
+			var typeBuilder = module.DefineType(name, TypeAttributes.Public, typeof (InterceptorArgs));
+
 			var baseConstructor =
 				typeof (InterceptorArgs).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single();
 			var constructor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis,
@@ -221,16 +192,70 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 			var proceedIl =
 				typeBuilder.DefineMethod("Proceed", MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
 					CallingConventions.HasThis).GetILGenerator();
-			if (proxiedMethod.ReturnType != typeof (void))
-				proceedIl.Emit(OpCodes.Ldarg_0);
 			proceedIl.Emit(OpCodes.Ldarg_0);
 			proceedIl.Emit(OpCodes.Ldfld,
 				typeof (InterceptorArgs).GetField("proxy", BindingFlags.NonPublic | BindingFlags.Instance));
+			var parameters = proxiedMethod.GetParameters();
+			for (var i = 0; i < parameters.Length; i++)
+			{
+				var parameter = parameters[i];
+				proceedIl.Emit(OpCodes.Ldarg_0);
+				proceedIl.Emit(OpCodes.Ldfld, typeof (InterceptorArgs).GetField("Invocation"));
+				proceedIl.Emit(OpCodes.Ldfld, typeof (MethodInvocation).GetField("Arguments"));
+				EmitIntConst(proceedIl, i);
+				proceedIl.Emit(OpCodes.Ldelem, typeof (object));
+				proceedIl.Emit(parameter.ParameterType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, parameter.ParameterType);
+			}
 			proceedIl.Emit(OpCodes.Callvirt, proxiedMethod);
 			if (proxiedMethod.ReturnType != typeof (void))
+			{
+				proceedIl.DeclareLocal(proxiedMethod.ReturnType);
+				proceedIl.Emit(OpCodes.Stloc_0);
+				proceedIl.Emit(OpCodes.Ldarg_0);
+				proceedIl.Emit(OpCodes.Ldloc_0);
+				if (proxiedMethod.ReturnType.IsValueType)
+					proceedIl.Emit(OpCodes.Box, proxiedMethod.ReturnType);
 				proceedIl.Emit(OpCodes.Stfld, typeof (InterceptorArgs).GetField("Result"));
+			}
 			proceedIl.Emit(OpCodes.Ret);
 			return typeBuilder.CreateType();
+		}
+
+		private static void EmitIntConst(ILGenerator ilGenerator, int i)
+		{
+			switch (i)
+			{
+				case 0:
+					ilGenerator.Emit(OpCodes.Ldc_I4_0);
+					break;
+				case 1:
+					ilGenerator.Emit(OpCodes.Ldc_I4_1);
+					break;
+				case 2:
+					ilGenerator.Emit(OpCodes.Ldc_I4_2);
+					break;
+				case 3:
+					ilGenerator.Emit(OpCodes.Ldc_I4_3);
+					break;
+				case 4:
+					ilGenerator.Emit(OpCodes.Ldc_I4_4);
+					break;
+				case 5:
+					ilGenerator.Emit(OpCodes.Ldc_I4_5);
+					break;
+				case 6:
+					ilGenerator.Emit(OpCodes.Ldc_I4_6);
+					break;
+				case 7:
+					ilGenerator.Emit(OpCodes.Ldc_I4_7);
+					break;
+				case 8:
+					ilGenerator.Emit(OpCodes.Ldc_I4_8);
+					break;
+				default:
+					ilGenerator.Emit(OpCodes.Ldc_I4, i);
+					break;
+			}
 		}
 
 		public interface IHandler
@@ -245,7 +270,9 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 
 		public abstract class InterceptorArgs
 		{
+			public MethodInvocation Invocation;
 			protected object proxy;
+			public object Result;
 
 			protected InterceptorArgs(object proxy, MethodInvocation invocation)
 			{
@@ -253,32 +280,17 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 				Invocation = invocation;
 			}
 
-			public MethodInvocation Invocation;//todo. field
-			public object Result;
-
 			public abstract void Proceed();
-		}
-
-		private class InterceptorArgsImpl : InterceptorArgs
-		{
-			public InterceptorArgsImpl(object proxy, MethodInvocation invocation) : base(proxy, invocation)
-			{
-			}
-
-			public override void Proceed()
-			{
-				throw new NotImplementedException();
-			}
 		}
 
 		private class Adapter : IInterceptor
 		{
+			private readonly IHandler handler;
+
 			public Adapter(IHandler handler)
 			{
 				this.handler = handler;
 			}
-
-			private readonly IHandler handler;
 
 			public void Handle(InterceptorArgs args)
 			{
@@ -286,10 +298,24 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 			}
 		}
 
-		public class MethodInvocation
+		public struct MethodInvocation
 		{
-			public MethodInfo MethodInfo;
-			public object[] Arguments;
+			private static readonly object[] EmptyArgs = new object[0];
+
+			public MethodInvocation(MethodInfo methodInfo)
+			{
+				MethodInfo = methodInfo;
+				Arguments = EmptyArgs;
+			}
+
+			public MethodInvocation(MethodInfo methodInfo, object[] arguments)
+			{
+				Arguments = arguments;
+				MethodInfo = methodInfo;
+			}
+
+			public readonly object[] Arguments;
+			public readonly MethodInfo MethodInfo;
 		}
 	}
 }
