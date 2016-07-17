@@ -93,34 +93,43 @@ namespace Kontur.Elba.Core.Utilities.Reflection
 						tuple.Item1.SetInterfaceConstraints(interfaceConstraints);
 					}
 				}
+
 				var ilg = proxyImplMethod.GetILGenerator();
-				// load interceptor
-				ilg.Emit(OpCodes.Ldarg_0);
-				ilg.Emit(OpCodes.Ldfld, interceptorField);
-				//new interceptor args
-				ilg.Emit(OpCodes.Ldarg_0);
-				ilg.Emit(OpCodes.Ldfld, proxyField);
-				
-				EmitNewMethodInvocation(ilg, originalMethod, methodInfosField, index);
-				
-				var interceptorArgsCtor =
-					GetInterceptorType(originalMethod).GetConstructor(new[] {typeof (object), typeof (MethodInvocation)});
-				ilg.Emit(OpCodes.Newobj, interceptorArgsCtor);
-				ilg.DeclareLocal(typeof (InterceptorArgs));
-				ilg.Emit(OpCodes.Stloc_0);
-				ilg.Emit(OpCodes.Ldloc_0);
-				// call interceptor handle method
-				ilg.Emit(OpCodes.Callvirt, typeof (IInterceptor).GetMethod("Handle"));
-				//get return value
-				if (originalMethod.ReturnType != typeof (void))
-				{
-					ilg.Emit(OpCodes.Ldloc_0);
-					ilg.Emit(OpCodes.Ldfld, typeof (InterceptorArgs).GetField("Result"));
-					ilg.Emit(originalMethod.ReturnType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, originalMethod.ReturnType);
-				}
-				ilg.Emit(OpCodes.Ret);
+				EmitProxyMethodForTarget(ilg, interceptorField, proxyField, originalMethod, methodInfosField, index);
 			}
 			return typeBuilder.CreateType();
+		}
+
+		private static void EmitProxyMethodForTarget(ILGenerator ilg, FieldBuilder interceptorField,
+			FieldBuilder proxyField, MethodInfo originalMethod, FieldBuilder methodInfosField, int index)
+		{
+			// load interceptor
+			ilg.Emit(OpCodes.Ldarg_0);
+			ilg.Emit(OpCodes.Ldfld, interceptorField);
+
+			//load proxy
+			ilg.Emit(OpCodes.Ldarg_0);
+			ilg.Emit(OpCodes.Ldfld, proxyField);
+
+			//new interceptor args
+			EmitNewMethodInvocation(ilg, originalMethod, methodInfosField, index);
+
+			var interceptorArgsCtor =
+				GetInterceptorType(originalMethod).GetConstructor(new[] {typeof (object), typeof (MethodInvocation)});
+			ilg.Emit(OpCodes.Newobj, interceptorArgsCtor);
+			ilg.DeclareLocal(typeof (InterceptorArgs));
+			ilg.Emit(OpCodes.Stloc_0);
+			ilg.Emit(OpCodes.Ldloc_0);
+			// call interceptor handle method
+			ilg.Emit(OpCodes.Callvirt, typeof (IInterceptor).GetMethod("Handle"));
+			//get return value
+			if (originalMethod.ReturnType != typeof (void))
+			{
+				ilg.Emit(OpCodes.Ldloc_0);
+				ilg.Emit(OpCodes.Ldfld, typeof (InterceptorArgs).GetField("Result"));
+				ilg.Emit(originalMethod.ReturnType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, originalMethod.ReturnType);
+			}
+			ilg.Emit(OpCodes.Ret);
 		}
 
 		private static void EmitNewMethodInvocation(ILGenerator generator, MethodInfo methodInfo, FieldInfo methodInfosField, int methodIndex)

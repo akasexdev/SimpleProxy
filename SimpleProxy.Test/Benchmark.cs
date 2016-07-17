@@ -42,19 +42,19 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		}
 		
 		[Benchmark]
-		public void Manual_ManySimpleParams()
+		public void Manual_ForTarget_ManySimpleParams()
 		{
 			manualForTarget.FooWithParams(1, 2, 3, 4);
 		}
 
 		[Benchmark]
-		public void Castle_ManySimpleParams()
+		public void Castle__ForTarget_ManySimpleParams()
 		{
 			castleForTarget.FooWithParams(1, 2, 3, 4);
 		}
 
 		[Benchmark]
-		public void Simple_ManySimpleParams()
+		public void Simple_ForTarget_ManySimpleParams()
 		{
 			simpleForTarget.FooWithParams(1, 2, 3, 4);
 		}
