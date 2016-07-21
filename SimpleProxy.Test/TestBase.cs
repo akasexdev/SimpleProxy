@@ -1,20 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Kontur.Elba.Core.Utilities.Reflection;
 using NUnit.Framework;
 
-namespace Kontur.Elba.Utilities.Tests.Reflection
+namespace SimpleProxy.Test
 {
 	[TestFixture]
 	public class TestBase
 	{
-		public class InvokeMethodWithoutArgs
+		public class WithoutTarget_MethodWithoutArgs
 		{
 			public interface IInterface2
 			{
-
 			}
+
 			public interface IInterface
 			{
 				void Foo();
@@ -23,7 +22,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			[Test]
 			public void Test()
 			{
-				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
+				var invocations = new List<MethodInvocation>();
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new DelegateHandler(c => invocations.Add(c)));
 				proxy.Foo();
 				Assert.That(invocations.Single().MethodInfo.Name, Is.EqualTo("Foo"));
@@ -31,7 +30,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class MethodWithArgs : TestBase
+		public class MethodArgumentsPassedCorrectly: TestBase
 		{
 			public interface IFoo
 			{
@@ -41,15 +40,15 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			[Test]
 			public void Test()
 			{
-				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
+				var invocations = new List<MethodInvocation>();
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IFoo>(new DelegateHandler(c => invocations.Add(c)));
 				proxy.Foo("one", "two");
-				Assert.That(invocations.Single().MethodInfo, Is.EqualTo(typeof(IFoo).GetMethod("Foo")));
+				Assert.That(invocations.Single().MethodInfo, Is.EqualTo(typeof (IFoo).GetMethod("Foo")));
 				Assert.That(invocations.Single().Arguments, Is.EqualTo(new object[] { "one", "two" }));
 			}
 		}
 
-		public class MethodWithPrimitiveArgs : TestBase
+		public class PrimitiveArgsPassedCorrectly: TestBase
 		{
 			public interface IFoo
 			{
@@ -59,7 +58,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			[Test]
 			public void Test()
 			{
-				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
+				var invocations = new List<MethodInvocation>();
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IFoo>(new DelegateHandler(c => invocations.Add(c)));
 				proxy.Foo(1, 2.5, 3m);
 				Assert.That(invocations.Single().MethodInfo.Name, Is.EqualTo("Foo"));
@@ -67,25 +66,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class MethodWithOptionalArgs : TestBase
-		{
-			public interface IFoo
-			{
-				void Foo(int one = 1, double two = 2, decimal three = 3);
-			}
-
-			[Test]
-			public void Test()
-			{
-				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
-				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IFoo>(new DelegateHandler(c => invocations.Add(c)));
-				proxy.Foo();
-				Assert.That(invocations.Single().MethodInfo.Name, Is.EqualTo("Foo"));
-				Assert.That(invocations.Single().Arguments, Is.EqualTo(new object[] { 1, 2d, 3m }));
-			}
-		}
-
-		public class MethodWithParams : TestBase
+		public class ParamsArgPassedAsSingleArg: TestBase
 		{
 			public interface IFoo
 			{
@@ -95,7 +76,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			[Test]
 			public void Test()
 			{
-				var invocations = new List<SimpleProxyFactory.MethodInvocation>();
+				var invocations = new List<MethodInvocation>();
 				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IFoo>(new DelegateHandler(c => invocations.Add(c)));
 				proxy.Foo(1, 2, 3);
 				Assert.That(invocations.Single().MethodInfo.Name, Is.EqualTo("Foo"));
@@ -103,7 +84,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class CanReturnValue : TestBase
+		public class WithoutTarget_CanReturnValue: TestBase
 		{
 			public interface IInterface
 			{
@@ -118,7 +99,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class CanReturnPrimitiveValue : TestBase
+		public class WithoutTarget_CanReturnPrimitiveValue: TestBase
 		{
 			public interface IInterface
 			{
@@ -133,7 +114,7 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class CanReturnUnderlyingNullable : TestBase
+		public class WithoutTarget_CanReturnUnderlyingNullable: TestBase
 		{
 			public interface IInterface
 			{
@@ -148,20 +129,41 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 		}
 
-		public class ProxyWithTarget_CalledWithCorrectParameters : TestBase
+		public class WithoutTarget_CanImplementMultipleInterfaces: TestBase
+		{
+			public interface IOne
+			{
+				string One();
+			}
+
+			public interface ITwo
+			{
+				string Two();
+			}
+
+			[Test]
+			public void Test()
+			{
+				var proxy = SimpleProxyFactory.CreateProxyWithoutTarget<IOne>(new DelegateHandler(c => c.MethodInfo.Name), typeof (ITwo));
+				Assert.That(proxy.One(), Is.EqualTo("One"));
+				Assert.That(((ITwo) proxy).Two(), Is.EqualTo("Two"));
+			}
+		}
+
+		public class WithTarget_CalledWithCorrectParameters: TestBase
 		{
 			public interface IInterface
 			{
 				void Foo(int one, int two, int three, string four);
 			}
 
-			private class Impl : IInterface
+			private class Impl: IInterface
 			{
-				public readonly List<Tuple<int, int, int, string>> Invocations = new List<Tuple<int, int, int, string>>();
+				public readonly List<object[]> Invocations = new List<object[]>();
 
 				public void Foo(int one, int two, int three, string four)
 				{
-					Invocations.Add(Tuple.Create(one, two, three, four));
+					Invocations.Add(new object[] { one, two, three, four });
 				}
 			}
 
@@ -171,18 +173,18 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 				var impl = new Impl();
 				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(c => c.Proceed()), impl);
 				proxy.Foo(1, 2, 3, "four");
-				Assert.That(impl.Invocations.Single(), Is.EqualTo(Tuple.Create(1, 2, 3, "four")));
+				Assert.That(impl.Invocations.Single(), Is.EqualTo(new object[] { 1, 2, 3, "four" }));
 			}
 		}
 
-		public class ProxyWithTarget_CanAddSimpleBehaviorForVoidMethod : TestBase
+		public class WithTarget_CanAddSimpleBehaviorForVoidMethod: TestBase
 		{
 			public interface IInterface
 			{
 				void Foo();
 			}
 
-			public class Impl : IInterface
+			public class Impl: IInterface
 			{
 				public int Invocations;
 
@@ -197,23 +199,23 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			{
 				var target = new Impl();
 				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args =>
-				{
-					Console.WriteLine("invocation");
-					args.Proceed();
-				}), target);
+																										{
+																											Console.WriteLine("invocation");
+																											args.Proceed();
+																										}), target);
 				proxy.Foo();
 				Assert.That(target.Invocations, Is.EqualTo(1));
 			}
 		}
 
-		public class ProxyWithTarget_CanAlterArguments : TestBase
+		public class WithTarget_CanAlterArguments: TestBase
 		{
 			public interface IInterface
 			{
 				void Foo(int arg);
 			}
 
-			public class Impl : IInterface
+			public class Impl: IInterface
 			{
 				public List<int> Invocations = new List<int>();
 
@@ -228,23 +230,23 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			{
 				var target = new Impl();
 				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args =>
-				{
-					args.Invocation.Arguments[0] = 43;
-					args.Proceed();
-				}), target);
+																										{
+																											args.Invocation.Arguments[0] = 43;
+																											args.Proceed();
+																										}), target);
 				proxy.Foo(42);
 				Assert.That(target.Invocations.Single(), Is.EqualTo(43));
 			}
 		}
 
-		public class ProxyWithTarget_CanAlterReturnValue : TestBase
+		public class WithTarget_TestReturnValue: TestBase
 		{
 			public interface IInterface
 			{
 				string Foo();
 			}
 
-			public class Impl : IInterface
+			public class Impl: IInterface
 			{
 				public string Foo()
 				{
@@ -253,14 +255,29 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			}
 
 			[Test]
-			public void Test()
+			public void CanInspectReturnValue()
 			{
 				var target = new Impl();
+				string returnValue = "";
 				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args =>
 				{
 					args.Proceed();
-					args.Result = "43";
+					returnValue = (string) args.Result;
 				}), target);
+				var actual = proxy.Foo();
+				Assert.That(returnValue, Is.EqualTo("42"));
+				Assert.That(actual, Is.EqualTo("42"));
+			}
+
+			[Test]
+			public void CanAlterReturnValue()
+			{
+				var target = new Impl();
+				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args =>
+																										{
+																											args.Proceed();
+																											args.Result = "43";
+																										}), target);
 				var actual = proxy.Foo();
 				Assert.That(actual, Is.EqualTo("43"));
 			}
@@ -270,24 +287,94 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			{
 				var target = new Impl();
 				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args =>
-				{
-					args.Proceed();
-					args.Result = new object();
-				}), target);
+																										{
+																											args.Proceed();
+																											args.Result = new object();
+																										}), target);
 				Assert.Throws<InvalidCastException>(() => proxy.Foo());
 			}
 		}
 
-		public class CreateProxyForGenericInterface : TestBase
+		public class WithTarget_ArgumentOfWrongType_ThrowException
+		{
+			public interface IInterface
+			{
+				void Foo(string one, int two);
+			}
+
+			public class Impl: IInterface
+			{
+				public void Foo(string one, int two)
+				{
+				}
+			}
+
+			[Test]
+			public void Test()
+			{
+				var proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(a =>
+																										{
+																											a.Invocation.Arguments[0] = 123;
+																											a.Proceed();
+																										}), new Impl());
+				Assert.Throws<InvalidCastException>(() => proxy.Foo("one", 2));
+				proxy = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(a =>
+																									{
+																										a.Invocation.Arguments[1] = "123";
+																										a.Proceed();
+																									}), new Impl());
+				Assert.Throws<InvalidCastException>(() => proxy.Foo("one", 2));
+			}
+		}
+
+
+		public class WithTarget_CanProxyMultipleInterfaces
+		{
+			public interface IOne
+			{
+				string One();
+			}
+
+			public interface ITwo
+			{
+				string Two();
+			}
+
+			public class Impl:IOne, ITwo
+			{
+				public string One()
+				{
+					return "one";
+				}
+
+				public string Two()
+				{
+					return "two";
+				}
+			}
+
+			[Test]
+			public void Test()
+			{
+				var proxy = SimpleProxyFactory.CreateProxyForTarget<ITwo>(new DelegateInterceptor(args =>
+																								  {
+																									  args.Proceed();
+																								  }), new Impl(), typeof (IOne));
+				Assert.That(proxy.Two(), Is.EqualTo("two"));
+				Assert.That(((IOne) proxy).One(), Is.EqualTo("one"));
+			}
+		}
+
+		public class CanCreateProxyForClosedGenericInterface: TestBase
 		{
 			public interface IGenericInterface<T>
 			{
 				T Foo(T value);
 			}
 
-			public class ClosedImpl : IGenericInterface<int>
+			public class Impl<T>: IGenericInterface<T>
 			{
-				public int Foo(int value)
+				public T Foo(T value)
 				{
 					return value;
 				}
@@ -296,50 +383,94 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 			[Test]
 			public void CreateProxyForClosedInterface()
 			{
-				var proxy = SimpleProxyFactory.CreateProxyForTarget<IGenericInterface<int>>(new DelegateInterceptor(args =>
-				{
-					args.Invocation.Arguments[0] = (int)args.Invocation.Arguments[0] + 1;
-					args.Proceed();
-					args.Result = (int)args.Result + 1;
-				}), new ClosedImpl());
-				Assert.That(proxy.Foo(42), Is.EqualTo(44));
+				var intProxy = SimpleProxyFactory.CreateProxyForTarget<IGenericInterface<int>>(new DelegateInterceptor(args =>
+																													{
+																														args.Invocation.Arguments[0] = (int) args.Invocation.Arguments[0] + 1;
+																														args.Proceed();
+																														args.Result = (int) args.Result + 1;
+																													}), new Impl<int>());
+				var stringProxy = SimpleProxyFactory.CreateProxyForTarget<IGenericInterface<string>>(new DelegateInterceptor(args => args.Proceed()), new Impl<string>());
+				Assert.That(intProxy.Foo(42), Is.EqualTo(44));
+				Assert.That(stringProxy.Foo("foo"), Is.EqualTo("foo"));
 			}
 		}
 
-		public class DelegateHandler : SimpleProxyFactory.IHandler
+		public class CanCreateDifferentProxiesForSameType: TestBase
 		{
-			private readonly Func<SimpleProxyFactory.MethodInvocation, object> handle;
+			public interface IInterface
+			{
+				string Foo();
+			}
 
-			public DelegateHandler(Func<SimpleProxyFactory.MethodInvocation, object> handle)
+			public interface IAnotherInterface
+			{
+				string Bar();
+			}
+
+			private class Impl: IInterface
+			{
+				private readonly string value;
+
+				public Impl(string value)
+				{
+					this.value = value;
+				}
+
+				public string Foo()
+				{
+					return value;
+				}
+			}
+
+			[Test]
+			public void Test()
+			{
+				var withoutTarget1 = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new DelegateHandler(_ => "withoutTarget1"));
+				var withoutTarget2 = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new DelegateHandler(_ => "withoutTarget2"));
+				var withTarget1 = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args => args.Result = "newValue1"), new Impl("originalValue1"));
+				var withTarget2 = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new DelegateInterceptor(args => args.Result = "newValue2"), new Impl("originalValue2"));
+
+				Assert.That(withoutTarget1.Foo(), Is.EqualTo("withoutTarget1"));
+				Assert.That(withoutTarget2.Foo(), Is.EqualTo("withoutTarget2"));
+				Assert.That(withTarget1.Foo(), Is.EqualTo("newValue1"));
+				Assert.That(withTarget2.Foo(), Is.EqualTo("newValue2"));
+			}
+		}
+
+		public class DelegateHandler: IHandler
+		{
+			private readonly Func<MethodInvocation, object> handle;
+
+			public DelegateHandler(Func<MethodInvocation, object> handle)
 			{
 				this.handle = handle;
 			}
 
-			public DelegateHandler(Action<SimpleProxyFactory.MethodInvocation> handle)
+			public DelegateHandler(Action<MethodInvocation> handle)
 			{
 				this.handle = i =>
-				{
-					handle(i);
-					return null;
-				};
+							  {
+								  handle(i);
+								  return null;
+							  };
 			}
 
-			public object Handle(SimpleProxyFactory.MethodInvocation invocation)
+			public object Handle(MethodInvocation invocation)
 			{
 				return handle(invocation);
 			}
 		}
 
-		public class DelegateInterceptor : SimpleProxyFactory.IInterceptor
+		public class DelegateInterceptor: IInterceptor
 		{
-			private readonly Action<SimpleProxyFactory.InterceptorArgs> action;
+			private readonly Action<InterceptorArgs> action;
 
-			public DelegateInterceptor(Action<SimpleProxyFactory.InterceptorArgs> action)
+			public DelegateInterceptor(Action<InterceptorArgs> action)
 			{
 				this.action = action;
 			}
 
-			public void Handle(SimpleProxyFactory.InterceptorArgs args)
+			public void Handle(InterceptorArgs args)
 			{
 				action(args);
 			}

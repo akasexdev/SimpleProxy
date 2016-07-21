@@ -1,12 +1,15 @@
+using System;
+using System.Linq;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Validators;
 using NUnit.Framework;
 
-namespace Kontur.Elba.Utilities.Tests.Reflection
+namespace SimpleProxy.Test
 {
 	[TestFixture]
 	public class Runner
@@ -14,22 +17,26 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		[Test]
 		public void Run()
 		{
-			BenchmarkRunner.Run<Benchmark>(new FastAndDirtyConfig());
+			var summary = BenchmarkRunner.Run<Benchmark>(new Config());
+			if (summary.ValidationErrors.Any())
+				Assert.Fail("Validation errors found: {0}", summary.ValidationErrors.Select(c => c.Message).JoinStrings(Environment.NewLine));
 		}
 
-		public class FastAndDirtyConfig : ManualConfig
+		public class Config : ManualConfig
 		{
-			public FastAndDirtyConfig()
+			public Config()
 			{
 				Add(Job.Default
-					.WithLaunchCount(1)     // benchmark process will be launched only once
-					.WithIterationTime(100) // 100ms per iteration
-					.WithWarmupCount(1)     // 3 warmup iteration
-					.WithTargetCount(3)     // 3 target iteration
+					.WithLaunchCount(3)
+					.WithIterationTime(300)
+					.WithWarmupCount(1)
+					.WithTargetCount(3)
 				);
 				Add(HtmlExporter.Default);
 				Add(ConsoleLogger.Default);
 				Add(PropertyColumn.Type, PropertyColumn.Method, PropertyColumn.LaunchCount, StatisticColumn.Median, StatisticColumn.P95);
+				Add(ExecutionValidator.FailOnError);
+				Add(JitOptimizationsValidator.FailOnError);
 			}
 		}
 	}

@@ -1,8 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using Castle.DynamicProxy;
-using Kontur.Elba.Core.Utilities.Reflection;
 
-namespace Kontur.Elba.Utilities.Tests.Reflection
+namespace SimpleProxy.Test
 {
 	public class Benchmark
 	{
@@ -12,119 +11,177 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 		private readonly IInterface manualWithoutTarget;
 		private readonly IInterface simpleForTarget;
 		private readonly IInterface simpleWithoutTarget;
+		private readonly SomeType someTypeObj = new SomeType();
 
 		public Benchmark()
 		{
 			manualWithoutTarget = new Impl();
 			manualForTarget = new Decorator(new Impl());
-			castleForTarget = new ProxyGenerator().CreateInterfaceProxyWithTarget<IInterface>(new Impl(), new Interceptor());
-			simpleForTarget = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new Interceptor(), new Impl());
-			castleWithoutTarget = new ProxyGenerator().CreateInterfaceProxyWithoutTarget<IInterface>(new Interceptor());
-			simpleWithoutTarget = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new Interceptor());
+			castleForTarget = new ProxyGenerator().CreateInterfaceProxyWithTarget<IInterface>(new Impl(), new CastleInterceptor(true));
+			simpleForTarget = SimpleProxyFactory.CreateProxyForTarget<IInterface>(new SimpleInterceptor(), new Impl());
+			castleWithoutTarget = new ProxyGenerator().CreateInterfaceProxyWithoutTarget<IInterface>(new CastleInterceptor(false));
+			simpleWithoutTarget = SimpleProxyFactory.CreateProxyWithoutTarget<IInterface>(new SimpleInterceptor());
 		}
+
 
 		[Benchmark]
 		public void Manual_NoParams()
 		{
-			manualForTarget.Foo();
+			manualForTarget.NoParameters();
 		}
 
 		[Benchmark]
 		public void Castle_NoParams()
 		{
-			castleForTarget.Foo();
+			castleForTarget.NoParameters();
 		}
 
 		[Benchmark]
 		public void Simple_NoParams()
 		{
-			simpleForTarget.Foo();
+			simpleForTarget.NoParameters();
 		}
 		
 		[Benchmark]
-		public void Manual_ForTarget_ManySimpleParams()
+		public void Manual_ForTarget_ManyValueParams()
 		{
-			manualForTarget.FooWithParams(1, 2, 3, 4);
+			manualForTarget.MultipleValueParameters(1, 2, 3, 4);
 		}
 
 		[Benchmark]
-		public void Castle__ForTarget_ManySimpleParams()
+		public void Castle_ForTarget_ManyValueParams()
 		{
-			castleForTarget.FooWithParams(1, 2, 3, 4);
-		}
-
-		[Benchmark]
-		public void Simple_ForTarget_ManySimpleParams()
-		{
-			simpleForTarget.FooWithParams(1, 2, 3, 4);
+			castleForTarget.MultipleValueParameters(1, 2, 3, 4);
 		}
 		
+		[Benchmark]
+		public void Simple_ForTarget_ManyValueParams()
+		{
+			simpleForTarget.MultipleValueParameters(1, 2, 3, 4);
+		}
+		
+		[Benchmark]
+		public void Manual_ForTarget_MultipleReferenceParams()
+		{
+			manualForTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
+		}
+
+		[Benchmark]
+		public void Castle_ForTarget_MultipleReferenceParams()
+		{
+			castleForTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
+		}
+
+		[Benchmark]
+		public void Simple_ForTarget_MultipleReferenceParams()
+		{
+			simpleForTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
+		}
+
+		//without target
 		[Benchmark]
 		public void Manual_WithoutTarget_NoParameters()
 		{
-			manualWithoutTarget.Foo();
+			manualWithoutTarget.NoParameters();
 		}
 
 		[Benchmark]
 		public void Castle_WithoutTarget_NoParameters()
 		{
-			castleWithoutTarget.Foo();
+			castleWithoutTarget.NoParameters();
 		}
 
 		[Benchmark]
 		public void Simple_WithoutTarget_NoParameters()
 		{
-			simpleWithoutTarget.Foo();
+			simpleWithoutTarget.NoParameters();
 		}
 
 		[Benchmark]
-		public void Manual_WithoutTarget_ManySimpleParams()
+		public void Manual_WithoutTarget_ManyValueParams()
 		{
-			manualWithoutTarget.FooWithParams(1, 2, 3, 4);
+			manualWithoutTarget.MultipleValueParameters(1, 2, 3, 4);
 		}
 
 		[Benchmark]
-		public void Castle_WithoutTarget_ManySimpleParams()
+		public void Castle_WithoutTarget_ManyValueParams()
 		{
-			castleWithoutTarget.FooWithParams(1, 2, 3, 4);
+			castleWithoutTarget.MultipleValueParameters(1, 2, 3, 4);
 		}
 
 		[Benchmark]
-		public void Simple_WithoutTarget_ManySimpleParams()
+		public void Simple_WithoutTarget_ManyValueParams()
 		{
-			simpleWithoutTarget.FooWithParams(1, 2, 3, 4);
+			simpleWithoutTarget.MultipleValueParameters(1, 2, 3, 4);
+		}
+
+		[Benchmark]
+		public void Manual_WithoutTarget_MultipleReferenceParams()
+		{
+			manualWithoutTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
+		}
+
+		[Benchmark]
+		public void Castle_WithoutTarget_MultipleReferenceParams()
+		{
+			castleWithoutTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
+		}
+
+		[Benchmark]
+		public void Simple_WithoutTarget_MultipleReferenceParams()
+		{
+			simpleWithoutTarget.MultipleReferenceParameters(someTypeObj, someTypeObj, someTypeObj, someTypeObj);
 		}
 
 		public interface IInterface
 		{
-			void Foo();
-			void FooWithParams(int one, int two, int three, int four);
+			void NoParameters();
+			void MultipleValueParameters(int one, int two, int three, int four);
+			void MultipleReferenceParameters(SomeType one, SomeType two, SomeType three, SomeType four);
 		}
 
 		private class Impl : IInterface
 		{
-			public void Foo()
+			public void NoParameters()
 			{
 			}
 
-			public void FooWithParams(int one, int two, int three, int four)
+			public void MultipleValueParameters(int one, int two, int three, int four)
 			{
+			}
+
+			public void MultipleReferenceParameters(SomeType one, SomeType two, SomeType three, SomeType four)
+			{
+				
 			}
 		}
 
-		public class Interceptor : IInterceptor, SimpleProxyFactory.IHandler, SimpleProxyFactory.IInterceptor
+		public class CastleInterceptor: Castle.DynamicProxy.IInterceptor
 		{
-			public object Handle(SimpleProxyFactory.MethodInvocation invocation)
+			private readonly bool forTarget;
+
+			public CastleInterceptor(bool forTarget)
 			{
-				return null;
+				this.forTarget = forTarget;
 			}
 
 			public void Intercept(IInvocation invocation)
 			{
+				if (forTarget)
+					invocation.Proceed();
+			}
+		}
+
+		public class SimpleInterceptor : IInterceptor, IHandler
+		{
+			public void Handle(InterceptorArgs args)
+			{
+				args.Proceed();
 			}
 
-			public void Handle(SimpleProxyFactory.InterceptorArgs args)
+			public object Handle(MethodInvocation invocation)
 			{
+				return null;
 			}
 		}
 
@@ -137,15 +194,25 @@ namespace Kontur.Elba.Utilities.Tests.Reflection
 				this.target = target;
 			}
 
-			public void Foo()
+			public void NoParameters()
 			{
-				target.Foo();
+				target.NoParameters();
 			}
 
-			public void FooWithParams(int one, int two, int three, int four)
+			public void MultipleValueParameters(int one, int two, int three, int four)
 			{
-				target.FooWithParams(one, two, three, four);
+				target.MultipleValueParameters(one, two, three, four);
 			}
+
+			public void MultipleReferenceParameters(SomeType one, SomeType two, SomeType three, SomeType four)
+			{
+				target.MultipleReferenceParameters(one, two, three, four);
+			}
+		}
+
+		public class SomeType
+		{
+			
 		}
 	}
 }

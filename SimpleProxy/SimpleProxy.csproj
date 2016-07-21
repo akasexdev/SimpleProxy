@@ -34,6 +34,12 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EnumerableExtensions.cs" />
+    <Compile Include="ExpressionHelpers.cs" />
+    <Compile Include="IHandler.cs" />
+    <Compile Include="IInterceptor.cs" />
+    <Compile Include="InterceptorArgs.cs" />
+    <Compile Include="MethodInvocation.cs" />
     <Compile Include="SimpleProxyFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
