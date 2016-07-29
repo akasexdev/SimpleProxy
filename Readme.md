@@ -22,6 +22,7 @@ CreateProxyForTarget
 Multiple reference parameters |126.6326 ns  | 187.8527 ns   | 5.8213 ns |
 
 CreateProxyWithoutTarget
+
 || Simple | Castle | By Hand |
 | ---| --- | --- | --- |
 |No parameters |37.8898 ns | 84.0170 ns | 2.7652 ns|
